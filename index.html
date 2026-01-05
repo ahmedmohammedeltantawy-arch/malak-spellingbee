@@ -237,11 +237,18 @@
         <h1>Princess Malak's<br>Spelling Castle</h1>
         <p>Are you ready to be a star? 🌟</p>
         
-        <label style="color:var(--accent); font-weight:bold; display:block; margin-top:20px;">Choose a Level:</label>
+        <label style="color:var(--accent); font-weight:bold; display:block; margin-top:15px;">Choose a Level:</label>
         <select id="grade-select">
             <option value="2">🌸 Grade 2 (Malak's Level)</option>
             <option value="3">🦄 Grade 3 (Challenge)</option>
             <option value="4">🦋 Grade 4 (Super Star)</option>
+        </select>
+        
+        <label style="color:var(--accent); font-weight:bold; display:block; margin-top:15px;">How many words?</label>
+        <select id="count-select">
+            <option value="10">10 Words (Quick Fun) ⚡</option>
+            <option value="15" selected>15 Words (Normal) 🌸</option>
+            <option value="25">25 Words (Super Star) 🌟</option>
         </select>
         <br>
         <button class="btn" type="button" onclick="tryStartGame(false)">Start Playing! 🚀</button>
@@ -297,10 +304,8 @@
 </div>
 
 <script>
-    // --- CONFIGURATION ---
-    const SESSION_LENGTH = 15; 
-    
     // --- FULL DATABASE ---
+    //
     const WORD_DATA = [
         {w:"pole",g:2},{w:"snake",g:2},{w:"mound",g:2},{w:"smaller",g:2},{w:"grand",g:2},
         {w:"gross",g:2},{w:"wish",g:2},{w:"stove",g:2},{w:"join",g:2},{w:"state",g:2},
@@ -435,21 +440,29 @@
         initAudio(); 
         
         if (!drillMode) {
+            // NORMAL START
             wrongAnswers = []; 
             document.getElementById('mode-label').classList.add('hidden');
+            
+            // Get inputs
             const gradeVal = document.getElementById('grade-select').value;
+            const countVal = document.getElementById('count-select').value;
+            
             const grade = parseInt(gradeVal);
+            const limit = parseInt(countVal);
             
             let pool = WORD_DATA.filter(w => w.g === grade);
             if (pool.length === 0) return alert("No words found!");
 
             pool.sort(() => Math.random() - 0.5);
-            sessionWords = pool.slice(0, SESSION_LENGTH);
+            
+            // Slice based on user choice
+            sessionWords = pool.slice(0, limit);
         } else {
+            // DRILL START
             document.getElementById('mode-label').classList.remove('hidden');
             let drillPool = [];
             wrongAnswers.forEach(item => {
-                // Ensure we carry over the 'w' (correct word) for the drill
                 let drillItem = { w: item.w, g: item.g };
                 drillPool.push(drillItem); 
                 drillPool.push(drillItem); 
@@ -552,7 +565,6 @@
             
             updateProgress(currentIndex, 'wrong');
             
-            // Store the user's wrong attempt alongside the correct word
             wrongAnswers.push({
                 w: targetWord,
                 g: targetObj.g,
@@ -589,8 +601,7 @@
             perfectMsg.classList.add('hidden');
             mistakeArea.classList.remove('hidden');
             
-            // Deduplicate for display (showing unique words)
-            // But display the "attempt" from the first error instance found
+            // Deduplicate for list
             const uniqueMap = new Map();
             wrongAnswers.forEach(item => {
                 if(!uniqueMap.has(item.w)) {
@@ -602,7 +613,6 @@
             uniqueMistakes.forEach(err => {
                 const li = document.createElement('li');
                 li.className = 'result-item';
-                // Show user attempt crossed out, then correct word
                 li.innerHTML = `
                     <span style="color:#aaa; text-decoration:line-through">${err.attempt || "..."}</span>
                     <span style="color:var(--primary); font-weight:bold;">${err.w}</span>
