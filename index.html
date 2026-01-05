@@ -13,7 +13,7 @@
             --text: #555;
             --success: #2ecc71;
             --error: #ff4757;
-            --hint: #f1c40f;    /* Yellow for Hint */
+            --hint: #f1c40f;    
             --font-main: 'Comic Sans MS', 'Chalkboard SE', 'Segoe UI', sans-serif;
         }
 
@@ -132,11 +132,15 @@
         .btn:hover { transform: translateY(-3px); box-shadow: 0 8px 0 #d63384; }
         .btn:active { transform: translateY(2px); box-shadow: 0 0 0 #d63384; }
         
+        /* Different Button Colors */
+        .btn-game { background: linear-gradient(to bottom, #ff85c0, #ff69b4); }
+        .btn-practice { background: linear-gradient(to bottom, #a29bfe, #6c5ce7); box-shadow: 0 5px 0 #4834d4; }
+        .btn-practice:hover { box-shadow: 0 8px 0 #4834d4; }
+        
         .btn-retry {
             background: linear-gradient(to bottom, #ff6b6b, #ee5253);
             box-shadow: 0 5px 0 #c0392b;
         }
-        .btn-retry:hover { box-shadow: 0 8px 0 #c0392b; }
 
         /* CONTROL BUTTONS GROUP */
         .controls {
@@ -205,6 +209,15 @@
             display: inline-block;
             margin-bottom: 10px;
         }
+        
+        /* PRACTICE MODE TARGET WORD */
+        #target-word-display {
+            font-size: 3rem;
+            color: var(--primary);
+            font-weight: bold;
+            margin: 10px 0;
+            text-shadow: 2px 2px 0 #eee;
+        }
 
         .hidden { display: none !important; }
         
@@ -252,12 +265,16 @@
             <option value="50">50 Words (The Queen) 👑</option>
         </select>
         <br>
-        <button class="btn" type="button" onclick="tryStartGame(false)">Start Playing! 🚀</button>
+        
+        <div style="display:flex; flex-direction:column; gap:10px; align-items:center;">
+            <button class="btn btn-practice" type="button" onclick="tryStartGame('practice')">📝 Practice Mode (Learn)</button>
+            <button class="btn btn-game" type="button" onclick="tryStartGame('test')">🎮 Game Mode (Test)</button>
+        </div>
     </div>
 
     <div id="game-screen" class="hidden">
         <div id="mode-label" class="hidden">
-            <span id="mode-indicator">🦄 Practice Mode (3x)</span>
+            <span id="mode-indicator">🦄 Practice Mode</span>
         </div>
 
         <div style="display:flex; justify-content:space-between; color: var(--accent); font-weight:bold; font-size:1.1rem;">
@@ -267,14 +284,16 @@
         
         <div id="progress-grid" class="progress-grid"></div>
         
+        <div id="target-word-display" class="hidden">WORD</div>
+        
         <div id="feedback-area"></div>
 
         <div class="controls">
             <button class="btn-round btn-listen" onclick="speakCurrentWord()" title="Listen to Word">🔊</button>
-            <button class="btn-round btn-hint" onclick="fetchAndSpeakDefinition()" title="Get a Hint">📖</button>
+            <button class="btn-round btn-hint" id="hint-btn" onclick="fetchAndSpeakDefinition()" title="Get a Hint">📖</button>
         </div>
         
-        <p style="margin-top:5px; font-size:0.9rem; color:#aaa;">Click speaker to listen • Click book for a hint</p>
+        <p id="help-text" style="margin-top:5px; font-size:0.9rem; color:#aaa;">Click speaker to listen • Click book for a hint</p>
 
         <input type="text" id="user-input" placeholder="Type here..." autocomplete="off">
         <br>
@@ -305,7 +324,7 @@
 </div>
 
 <script>
-    // --- FULL DATABASE ---
+    // --- DATABASE ---
     //
     const WORD_DATA = [
         {w:"pole",g:2},{w:"snake",g:2},{w:"mound",g:2},{w:"smaller",g:2},{w:"grand",g:2},
@@ -354,7 +373,6 @@
             audioCtx.resume();
         }
         
-        // Load voices
         availableVoices = window.speechSynthesis.getVoices();
         if (availableVoices.length === 0) {
             window.speechSynthesis.onvoiceschanged = () => {
@@ -387,7 +405,6 @@
         window.speechSynthesis.speak(u);
     }
 
-    // Sound FX
     function playDing() {
         if (!audioCtx) initAudio();
         const osc = audioCtx.createOscillator();
@@ -423,7 +440,8 @@
     let currentIndex = 0;
     let wrongAnswers = [];
     let score = 0;
-    let isDrillMode = false;
+    let currentMode = 'test'; // 'test', 'practice', 'drill'
+    let practiceReps = 0; // Counts 0 to 3 for practice mode
 
     function tryStartGame(mode) {
         try {
@@ -433,22 +451,33 @@
         }
     }
 
-    function startGame(drillMode) {
-        isDrillMode = drillMode;
+    function startGame(mode) {
+        currentMode = mode;
         currentIndex = 0;
         score = 0;
+        practiceReps = 0;
+        wrongAnswers = []; 
         
         initAudio(); 
         
-        if (!drillMode) {
-            // NORMAL START
-            wrongAnswers = []; 
-            document.getElementById('mode-label').classList.add('hidden');
-            
-            // Get inputs
+        document.getElementById('mode-label').classList.add('hidden');
+        document.getElementById('target-word-display').classList.add('hidden');
+        document.getElementById('hint-btn').classList.remove('hidden'); // Show hint button by default
+        
+        // 1. SETUP WORD POOL
+        if (mode === 'drill') {
+            // Drill mode logic (re-practice mistakes)
+             document.getElementById('mode-label').classList.remove('hidden');
+             document.getElementById('mode-indicator').innerText = "🦄 Drill Mode (3x)";
+             // Use existing drill logic (already shuffled externally or we do it here)
+             // We assume 'sessionWords' is already populated for drill before calling this
+             // But simpler: let's build drill pool here if passed 'drill'
+             // Actually, simplest is to handle drill pool preparation before calling startGame
+             // For now, let's assume sessionWords is set for drill.
+        } else {
+            // Normal Setup (Practice or Test)
             const gradeVal = document.getElementById('grade-select').value;
             const countVal = document.getElementById('count-select').value;
-            
             const grade = parseInt(gradeVal);
             const limit = parseInt(countVal);
             
@@ -456,23 +485,48 @@
             if (pool.length === 0) return alert("No words found!");
 
             pool.sort(() => Math.random() - 0.5);
-            
-            // Slice based on user choice
             sessionWords = pool.slice(0, limit);
-        } else {
-            // DRILL START
-            document.getElementById('mode-label').classList.remove('hidden');
-            let drillPool = [];
-            wrongAnswers.forEach(item => {
-                let drillItem = { w: item.w, g: item.g };
-                drillPool.push(drillItem); 
-                drillPool.push(drillItem); 
-                drillPool.push(drillItem);
-            });
-            drillPool.sort(() => Math.random() - 0.5);
-            sessionWords = drillPool;
-            wrongAnswers = []; 
+            
+            if (mode === 'practice') {
+                 document.getElementById('mode-label').classList.remove('hidden');
+                 document.getElementById('mode-indicator').innerText = "📝 Practice Mode";
+                 document.getElementById('target-word-display').classList.remove('hidden');
+                 document.getElementById('hint-btn').classList.add('hidden'); // No hint needed in practice
+            }
         }
+        
+        // UI Reset
+        document.getElementById('score-display').innerText = "0";
+        document.getElementById('current-count').innerText = "1";
+        document.getElementById('feedback-area').innerText = "";
+        
+        setupProgressGrid();
+        switchScreen('game-screen');
+        setTimeout(loadWord, 500);
+    }
+    
+    // Helper to start drill mode from results screen
+    function startDrillMode() {
+        currentMode = 'drill';
+        // Build drill pool
+        let drillPool = [];
+        wrongAnswers.forEach(item => {
+             // 3x for drill
+             drillPool.push(item); drillPool.push(item); drillPool.push(item);
+        });
+        drillPool.sort(() => Math.random() - 0.5);
+        sessionWords = drillPool;
+        
+        currentIndex = 0;
+        score = 0;
+        practiceReps = 0;
+        wrongAnswers = []; // Reset for new round
+        
+        initAudio();
+        document.getElementById('mode-label').classList.remove('hidden');
+        document.getElementById('mode-indicator').innerText = "🦄 Drill Mode (3x)";
+        document.getElementById('target-word-display').classList.add('hidden');
+        document.getElementById('hint-btn').classList.remove('hidden');
         
         document.getElementById('score-display').innerText = "0";
         document.getElementById('current-count').innerText = "1";
@@ -508,6 +562,16 @@
         document.getElementById('current-count').innerText = currentIndex + 1;
         document.getElementById('feedback-area').innerText = "";
         updateProgress(currentIndex, 'active');
+        
+        // Practice Mode: Show Word
+        if (currentMode === 'practice') {
+             document.getElementById('target-word-display').innerText = sessionWords[currentIndex].w;
+             document.getElementById('feedback-area').innerText = "Copy the word 3 times!";
+             practiceReps = 0;
+        } else {
+             document.getElementById('target-word-display').innerText = "";
+        }
+        
         speakCurrentWord();
     }
 
@@ -544,39 +608,85 @@
         const targetWord = targetObj.w;
         const feedback = document.getElementById('feedback-area');
 
+        // CHECK ANSWER
         if (input.toLowerCase() === targetWord.toLowerCase()) {
-            score++;
-            document.getElementById('score-display').innerText = score;
-            playDing();
-            updateProgress(currentIndex, 'correct');
             
-            const praise = POSITIVE_WORDS[Math.floor(Math.random() * POSITIVE_WORDS.length)];
-            feedback.innerText = praise;
-            feedback.style.color = "var(--success)";
-            
-            const inputEl = document.getElementById('user-input');
-            inputEl.classList.remove('shake');
-            inputEl.classList.add('pop');
-            setTimeout(() => inputEl.classList.remove('pop'), 300);
+            // --- LOGIC FOR PRACTICE MODE ---
+            if (currentMode === 'practice') {
+                practiceReps++;
+                playDing();
+                
+                const inputEl = document.getElementById('user-input');
+                inputEl.value = ''; // Clear input to force re-typing
+                inputEl.focus();
+                
+                // Animation
+                inputEl.classList.remove('shake');
+                inputEl.classList.add('pop');
+                setTimeout(() => inputEl.classList.remove('pop'), 300);
+
+                if (practiceReps < 3) {
+                    const remaining = 3 - practiceReps;
+                    feedback.innerText = `Good! Write it ${remaining} more time${remaining > 1 ? 's' : ''}.`;
+                    feedback.style.color = "var(--primary)";
+                    return; // EXIT FUNCTION, WAIT FOR NEXT INPUT
+                } else {
+                    // Completed 3 reps
+                    score++; // In practice mode, finishing a word counts as score
+                    document.getElementById('score-display').innerText = score;
+                    updateProgress(currentIndex, 'correct');
+                    feedback.innerText = "Perfect! Next word!";
+                    feedback.style.color = "var(--success)";
+                }
+            } 
+            // --- LOGIC FOR TEST/DRILL MODE ---
+            else {
+                score++;
+                document.getElementById('score-display').innerText = score;
+                playDing();
+                updateProgress(currentIndex, 'correct');
+                
+                const praise = POSITIVE_WORDS[Math.floor(Math.random() * POSITIVE_WORDS.length)];
+                feedback.innerText = praise;
+                feedback.style.color = "var(--success)";
+                
+                const inputEl = document.getElementById('user-input');
+                inputEl.classList.remove('shake');
+                inputEl.classList.add('pop');
+                setTimeout(() => inputEl.classList.remove('pop'), 300);
+            }
 
         } else {
+            // WRONG ANSWER
             playBuzz();
-            feedback.innerText = "Oops! Not quite. Keep trying!";
+            
+            if (currentMode === 'practice') {
+                feedback.innerText = "Oops! Look at the word and try again.";
+            } else {
+                feedback.innerText = "Oops! Not quite. Keep trying!";
+                // Only track mistake in test/drill modes
+                wrongAnswers.push({
+                    w: targetWord,
+                    g: targetObj.g,
+                    attempt: input
+                });
+                updateProgress(currentIndex, 'wrong');
+            }
+            
             feedback.style.color = "var(--error)";
-            
-            updateProgress(currentIndex, 'wrong');
-            
-            wrongAnswers.push({
-                w: targetWord,
-                g: targetObj.g,
-                attempt: input
-            });
-            
             const inputEl = document.getElementById('user-input');
             inputEl.classList.add('shake');
             setTimeout(() => inputEl.classList.remove('shake'), 300);
+            
+            // In test/drill mode, wrong answer moves to next word immediately
+            if (currentMode !== 'practice') {
+                // proceed to next word logic below
+            } else {
+                return; // In practice mode, stay on word until correct
+            }
         }
 
+        // MOVE TO NEXT WORD
         currentIndex++;
 
         if (currentIndex < sessionWords.length) {
@@ -594,15 +704,25 @@
         const perfectMsg = document.getElementById('perfect-message');
         const mistakeArea = document.getElementById('mistake-area');
 
+        // In Practice Mode, score is always perfect if they finished, so hide mistakes
+        if (currentMode === 'practice') {
+            perfectMsg.classList.remove('hidden');
+            perfectMsg.innerText = "🌟 Great Practice Session! 🌟";
+            mistakeArea.classList.add('hidden');
+            playDing(); playDing();
+            switchScreen('result-screen');
+            return;
+        }
+
         if (wrongAnswers.length === 0) {
             perfectMsg.classList.remove('hidden');
+            perfectMsg.innerText = "🌟 PERFECT SCORE! You are a Queen! 🌟";
             mistakeArea.classList.add('hidden');
             playDing(); playDing();
         } else {
             perfectMsg.classList.add('hidden');
             mistakeArea.classList.remove('hidden');
             
-            // Deduplicate for list
             const uniqueMap = new Map();
             wrongAnswers.forEach(item => {
                 if(!uniqueMap.has(item.w)) {
@@ -623,10 +743,6 @@
         }
 
         switchScreen('result-screen');
-    }
-
-    function startDrillMode() {
-        tryStartGame(true);
     }
 
     function resetGame() {
